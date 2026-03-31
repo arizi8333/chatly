@@ -1,0 +1,24 @@
+services:
+  app-1:
+    build: .
+    ports:
+      - "8090:8080"
+    environment:
+      - PORT=8080
+      - DB_URL=postgres://postgres:postgres@host.docker.internal:5432/chatly?sslmode=disable
+      - REDIS_URL=host.docker.internal:6379
+      - JWT_SECRET=super-secret
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  app-2:
+    build: .
+    ports:
+      - "8091:8080"
+    environment:
+      - PORT=8080
+      - DB_URL=postgres://postgres:postgres@host.docker.internal:5432/chatly?sslmode=disable
+      - REDIS_URL=host.docker.internal:6379
+      - JWT_SECRET=super-secret
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

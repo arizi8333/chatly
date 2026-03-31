@@ -1,0 +1,9 @@
+.env
+chatly
+tmp/
+vendor/
+.idea/
+.vscode/
+*.exe
+*.test
+*.out

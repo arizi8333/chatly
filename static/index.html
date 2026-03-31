@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatly - Real-time Messaging</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            height: 80vh;
+            background: var(--surface);
+            border-radius: 1.5rem;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        #login-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--bg);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1.5rem;
+        }
+
+        .card {
+            width: 320px;
+            padding: 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 2rem;
+            font-weight: 600;
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Chat UI */
+        .chat-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .message-bubble.own {
+            align-self: flex-end;
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .m-user {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .m-text {
+            font-size: 0.95rem;
+        }
+
+        .chat-input {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .chat-input input {
+            margin-bottom: 0;
+        }
+
+        .chat-input button {
+            width: auto;
+            padding: 0.75rem 1.5rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="login-overlay">
+            <div class="card">
+                <h1>Chatly Login</h1>
+                <input type="email" id="email" placeholder="Email" value="al@chatly.io">
+                <input type="password" id="password" placeholder="Password" value="password123">
+                <button onclick="login()">Login</button>
+                <p id="auth-err" style="color: #ef4444; font-size: 0.875rem; margin-top: 1rem;" class="hidden"></p>
+            </div>
+        </div>
+
+        <div class="chat-header">
+            <div>
+                <span style="font-weight: 600;">Room:</span>
+                <span id="room-display" style="color: var(--primary);">general</span>
+            </div>
+            <button onclick="location.reload()"
+                style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Logout</button>
+        </div>
+
+        <div class="messages" id="message-list">
+            <!-- Messages go here -->
+        </div>
+
+        <div class="chat-input" id="input-area">
+            <input type="text" id="m-input" placeholder="Tulis pesan..."
+                onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Kirim</button>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        let ws = null;
+        let room = 'general';
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errEl = document.getElementById('auth-err');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.access_token;
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    initWS();
+                    loadHistory();
+                } else {
+                    errEl.innerText = data.error || 'Login failed';
+                    errEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errEl.innerText = 'Server unreachable';
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        function initWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?room=${room}&token=${token}`);
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                addMessage(msg);
+            };
+
+            ws.onclose = () => {
+                alert('Connection closed. Please login again.');
+                location.reload();
+            };
+        }
+
+        async function loadHistory() {
+            const res = await fetch(`/api/messages?room=${room}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const messages = await res.json();
+            if (Array.isArray(messages)) {
+                messages.reverse().forEach(addMessage);
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('m-input');
+            const content = input.value.trim();
+            if (!content || !ws) return;
+
+            ws.send(JSON.stringify({ content }));
+            input.value = '';
+        }
+
+        function addMessage(msg) {
+            const list = document.getElementById('message-list');
+            const div = document.createElement('div');
+
+            // Note: we don't know the current user ID in JS perfectly without another API call,
+            // but we can just show them as bubbles.
+            div.className = 'message-bubble';
+            div.innerHTML = `
+                <div class="m-user">${msg.username || 'User'} • ${new Date(msg.created_at).toLocaleTimeString()}</div>
+                <div class="m-text">${msg.content}</div>
+            `;
+
+            list.appendChild(div);
+            list.scrollTop = list.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>
